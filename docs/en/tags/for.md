@@ -14,27 +14,23 @@ Tag {for}
 ```
 
 ### {for}
+   
+The $counter variable takes on a value equal to <start> and increases its value by <step> at each iteration of the loop until it reaches or becomes greater then <end>. <step> is an optional argument. If not specified, it is considered equal to one. $index has the value of the current iteration number. The first iteration is numbered 0. 
+$first is TRUE if iteration is the first. 
+$last is TRUE if the iteration is last.
 
-Переменная `$counter` принимает значение <start> и увеличивает своё значение на <step> на каждой итерации цикла пока не достигнет или не станет больше <end>.
-<step> является необязательным аргументом. Если не указан, считается равным единице.
-`$index` имеет значение номера текущей итерации. Первая итерация имеет номер 0.
-`$first` равно **TRUE**, если итерация первая.
-`$last` равно **TRUE**, если итерация последняя.
-
-Поля `<start>`, `<end>`, `<step>` могут быть числами, или переменными, значение которых приводится к числовому.
-Значением параметров _index_, _first_, _last_ может быть только переменная (допускаются вложенности на подобии `$a.b.c`, но массив `$a.b` должен быть объявлен).
-
+Fields <start>, <end>, <step> can be numbers, or variables whose value is converted to numeric. The value of the index, first, last parameters can only be a variable (nesting like $a.b.c is allowed, but the $a.b array must be declared).
 
 ### {break}
 
-Тег `{break}` используется для выхода из цикла до достижения последней итерации. Если в цикле встречается тег {break}, цикл завершает свою работу, и далее выполняется код, следующий сразу за блоком цикла
+The `{break}` tag is used to break out of the loop before reaching the last iteration. If the {break} tag is encountered in the loop, the loop ends its work, and then the code immediately following the loop block is executed
 
 
 ### {continue}
 
-Тег `{continue}` используется для прерывания текущей итерации. Если в цикле встречается тег {continue}, часть цикла, следующая после тега, не выполняется, и начинается следующая итерация. Если текущая итерация была последней, цикл завершается.
+The `{continue}` tag is used to interrupt the current iteration. If the {continue} tag is encountered in the loop, the part of the loop following the tag is not executed and the next iteration begins. If the current iteration was the last, the loop ends.
 
 
 ### {forelse}
 
-Тег `{forelse}` ограничивает код, который должен быть выполнен, если сочетание полей <start>, <end> и <step> не обеспечивают ни одной итерации.
+The `{forelse}` tag limits the code that must be executed if the combination of fields, and does not provide any iteration.
