@@ -13,7 +13,7 @@ use Fenom\Template,
 class TemplateTest extends TestCase
 {
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
         $this->tpl('welcome.tpl', '<b>Welcome, {$username} ({$email})</b>');
@@ -441,6 +441,9 @@ class TemplateTest extends TestCase
             array('Create: {set $v = $x+$y} Result: {$v} end', $a, 'Create: Result: 36 end'),
             array('Create: {add $x = $x+$y} Result: {$x} end', $a, 'Create: Result: 9 end'),
             array('Create: {add $v = 3} {add $v = 9} Result: {$v} end', $a, 'Create: Result: 3 end'),
+            array('Create: {add $v}Hello{/add} Result: {$v} end', $a, 'Create: Result: Hello end'),
+            array('Create: {add $v}Value: {$x}{/add} Result: {$v} end', $a, 'Create: Result: Value: 9 end'),
+            array('Create: {set $v = "first"}{add $v}second{/add} Result: {$v} end', $a, 'Create: Result: first end'),
             array(
                 'Create: {set $v =
                             $x
@@ -1202,8 +1205,8 @@ class TemplateTest extends TestCase
         $this->values = $vars;
         $this->tpl("insert.tpl", $code);
         $tpl = $this->fenom->getTemplate('insert.tpl');
-        $this->assertSame($result, $tpl->fetch($vars));
-        $this->assertTrue($tpl->isValid());
+        $this->assertSame($result, $tpl->fetch($vars), $code);
+        $this->assertTrue($tpl->isValid(), $code);
     }
 
     /**

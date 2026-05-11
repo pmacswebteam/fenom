@@ -9,6 +9,7 @@
  */
 namespace Fenom;
 
+use Fenom\Error\CompileException;
 use Fenom\Error\UnexpectedTokenException;
 
 /**
@@ -16,7 +17,7 @@ use Fenom\Error\UnexpectedTokenException;
  * @package Fenom
  */
 class Accessor {
-    public static $vars = array(
+    public static array $vars = array(
         'get'     => '$_GET',
         'post'    => '$_POST',
         'session' => '$_SESSION',
@@ -32,10 +33,11 @@ class Accessor {
      * @param string $var variable expression on PHP ('App::get("storage")->user')
      * @param Tokenizer $tokens
      * @param Template $tpl
-     * @param $is_var
+     * @param bool $is_var
      * @return string
+     * @throws CompileException
      */
-    public static function parserVar($var, Tokenizer $tokens, Template $tpl, &$is_var)
+    public static function parserVar(string $var, Tokenizer $tokens, Template $tpl, bool &$is_var): string
     {
         $is_var = true;
         return $tpl->parseVariable($tokens, $var);
@@ -47,7 +49,7 @@ class Accessor {
      * @param Template $tpl
      * @return string
      */
-    public static function parserCall($call, Tokenizer $tokens, Template $tpl)
+    public static function parserCall(string $call, Tokenizer $tokens, Template $tpl): string
     {
         return $call.$tpl->parseArgs($tokens);
     }
@@ -56,10 +58,11 @@ class Accessor {
      * @param string $prop fenom's property name
      * @param Tokenizer $tokens
      * @param Template $tpl
-     * @param $is_var
+     * @param bool $is_var
      * @return string
+     * @throws CompileException
      */
-    public static function parserProperty($prop, Tokenizer $tokens, Template $tpl, &$is_var)
+    public static function parserProperty(string $prop, Tokenizer $tokens, Template $tpl, bool &$is_var): string
     {
         $is_var = true;
         return self::parserVar('$tpl->getStorage()->'.$prop, $tokens, $tpl, $is_var);
@@ -71,7 +74,7 @@ class Accessor {
      * @param Template $tpl
      * @return string
      */
-    public static function parserMethod($method, Tokenizer $tokens, Template $tpl)
+    public static function parserMethod(string $method, Tokenizer $tokens, Template $tpl): string
     {
         return self::parserCall('$tpl->getStorage()->'.$method, $tokens, $tpl);
     }
@@ -81,13 +84,14 @@ class Accessor {
      * @param Tokenizer $tokens
      * @param Template $tpl
      * @return string
+     * @throws CompileException
      */
-    public static function getVar(Tokenizer $tokens, Template $tpl)
+    public static function getVar(Tokenizer $tokens, Template $tpl): string
     {
-        $name = $tokens->prev[Tokenizer::TEXT];
+        $name = $tokens->prevToken()[Tokenizer::TEXT];
         if(isset(self::$vars[$name])) {
             $var = $tpl->parseVariable($tokens, self::$vars[$name]);
-            return "(isset($var) ? $var : null)";
+            return "(($var) ?? null)";
         } else {
             throw new UnexpectedTokenException($tokens->back());
         }
@@ -98,7 +102,7 @@ class Accessor {
      * @param Tokenizer $tokens
      * @return string
      */
-    public static function tpl(Tokenizer $tokens)
+    public static function tpl(Tokenizer $tokens): string
     {
         $method = $tokens->skip('.')->need(T_STRING)->getAndNext();
         if(method_exists('Fenom\Render', 'get'.$method)) {
@@ -111,7 +115,7 @@ class Accessor {
     /**
      * @return string
      */
-    public static function version()
+    public static function version(): string
     {
         return 'Fenom::VERSION';
     }
@@ -120,18 +124,43 @@ class Accessor {
      * @param Tokenizer $tokens
      * @return string
      */
-    public static function constant(Tokenizer $tokens)
+    public static function constant(Tokenizer $tokens, Template $tpl, bool &$is_var): string
     {
-        $const = array($tokens->skip('.')->need(Tokenizer::MACRO_STRING)->getAndNext());
-        while($tokens->is('.')) {
-            $const[] = $tokens->next()->need(Tokenizer::MACRO_STRING)->getAndNext();
-        }
-        $const = implode('\\', $const);
-        if($tokens->is(T_DOUBLE_COLON)) {
-            $const .= '::'.$tokens->next()->need(Tokenizer::MACRO_STRING)->getAndNext();
-        }
-        return '@constant('.var_export($const, true).')';
+        $parts = [];
+        $firstPart = $tokens->skip('.')->need(Tokenizer::MACRO_STRING)->getAndNext();
+        $parts[] = $firstPart;
+        $is_var = false;
 
+        while ($tokens->is('.')) {
+            $parts[] = $tokens->next()->need(Tokenizer::MACRO_STRING)->getAndNext();
+        }
+
+        if ($tokens->is(T_DOUBLE_COLON)) {
+            $fullConstName = implode('\\', $parts);
+            $fullConstName .= '::' . $tokens->next()->need(Tokenizer::MACRO_STRING)->getAndNext();
+            return '(defined(' . var_export($fullConstName, true) . ') ? constant(' . var_export($fullConstName, true) . ') : "")';
+        }
+
+        $fullConstName = implode('\\', $parts);
+        if (defined($fullConstName)) {
+            $result = '(defined(' . var_export($fullConstName, true) . ') ? constant(' . var_export($fullConstName, true) . ') : "")';
+            if ($tokens->is('.')) {
+                return $tpl->parseChain($tokens, $result);
+            }
+            return $result;
+        }
+
+        $baseName = array_shift($parts);
+        if ($parts) {
+            $result = '(defined(' . var_export($baseName, true) . ') ? constant(' . var_export($baseName, true) . ')';
+            foreach ($parts as $part) {
+                $result .= '["' . $part . '"]';
+            }
+            $result .= ' : "")';
+            return $result;
+        }
+
+        return '(defined(' . var_export($baseName, true) . ') ? constant(' . var_export($baseName, true) . ') : "")';
     }
 
     /**
@@ -139,9 +168,9 @@ class Accessor {
      * @param Template $tpl
      * @return string
      */
-    public static function call(Tokenizer $tokens, Template $tpl)
+    public static function call(Tokenizer $tokens, Template $tpl): string
     {
-        $callable = array($tokens->skip('.')->need(Tokenizer::MACRO_STRING)->getAndNext());
+        $callable = [$tokens->skip('.')->need(Tokenizer::MACRO_STRING)->getAndNext()];
         while($tokens->is('.')) {
             $callable[] = $tokens->next()->need(Tokenizer::MACRO_STRING)->getAndNext();
         }
@@ -149,7 +178,7 @@ class Accessor {
         if($tokens->is(T_DOUBLE_COLON)) {
             $callable .= '::'.$tokens->next()->need(Tokenizer::MACRO_STRING)->getAndNext();
         }
-        $call_filter = $tpl->getStorage()->call_filters;
+        $call_filter = $tpl->getStorage()->getCallFilters();
         if($call_filter) {
             foreach($call_filter as $filter) {
                 if(!fnmatch(addslashes($filter), $callable)) {
@@ -175,7 +204,7 @@ class Accessor {
      * @param Template $tpl
      * @return string
      */
-    public static function fetch(Tokenizer $tokens, Template $tpl)
+    public static function fetch(Tokenizer $tokens, Template $tpl): string
     {
         $tokens->skip('(');
         $name = $tpl->parsePlainArg($tokens, $static);
@@ -185,8 +214,12 @@ class Accessor {
             }
         }
         if($tokens->is(',')) {
-            $tokens->skip()->need('[');
-            $vars = $tpl->parseArray($tokens) . ' + $var';
+            $tokens->next();
+            if($tokens->is('[')){
+                $vars = $tpl->parseArray($tokens) . ' + $var';
+            } elseif($tokens->is(T_VARIABLE)){
+                $vars = $tpl->parseExpr($tokens) . ' + $var';
+            }
         } else {
             $vars = '$var';
         }
@@ -198,9 +231,9 @@ class Accessor {
      * Accessor {$.block.NAME}
      * @param Tokenizer $tokens
      * @param Template $tpl
-     * @return mixed
+     * @return string
      */
-    public static function block(Tokenizer $tokens, Template $tpl)
+    public static function block(Tokenizer $tokens, Template $tpl): string
     {
         if($tokens->is('.')) {
             $name = $tokens->next()->get(Tokenizer::MACRO_STRING);
