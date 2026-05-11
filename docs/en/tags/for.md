@@ -33,4 +33,4 @@ The `{continue}` tag is used to interrupt the current iteration. If the {continu
 
 ### {forelse}
 
-Тег {forelse} ограничивает код, который должен быть выполнен, если сочетание полей , и не обеспечивают ни одной итерации.
+The `{forelse}` tag encloses the code that should be executed if the combination of the <start>, <end>, and <step> fields yields no iterations.
